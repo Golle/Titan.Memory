@@ -12,7 +12,7 @@ unsafe
         }
     );
 
-    var allocator = native;
+    var allocator = win32Fixed;
     {
         Console.ForegroundColor = ConsoleColor.Red;
         Console.WriteLine($"****** {nameof(PoolArena)} ******");
@@ -149,6 +149,9 @@ unsafe
 
 
     win32Fixed.Release();
+    native.Release();
+    win32.Release();
+
     Console.WriteLine("Hello, World!");
 }
 

@@ -14,8 +14,8 @@ internal unsafe interface IAllocator<TArguments> where TArguments : unmanaged
 }
 internal unsafe interface IAllocator
 {
-    static abstract void* Allocate(void* context, nuint size);
-    static abstract void Free(void* context, void* ptr);
+    static abstract void* Allocate(nuint size);
+    static abstract void Free(void* ptr);
 }
 
 internal unsafe struct Allocator
@@ -44,8 +44,8 @@ internal unsafe struct Allocator
     public static Allocator Create<T>() where T : unmanaged, IAllocator =>
         new()
         {
-            _allocate = &T.Allocate,
-            _free = &T.Free,
+            _allocate = &FunctionWrapper<T>.Allocate,
+            _free = &FunctionWrapper<T>.Free,
             _context = null,
             _release = null
         };
@@ -66,6 +66,12 @@ internal unsafe struct Allocator
             _allocate = &TAllocator.Allocate,
             _free = &TAllocator.Free
         };
+
+    private struct FunctionWrapper<T> where T : unmanaged, IAllocator
+    {
+        public static void* Allocate(void* _, nuint size) => T.Allocate(size);
+        public static void Free(void* _, void* ptr) => T.Free(ptr);
+    }
 }
 
 struct Win32PoolArgs
@@ -117,31 +123,26 @@ internal unsafe struct Win32VirtualAllocFixedSizeAllocator : IAllocator<Win32Poo
 internal unsafe struct Win32VirtualAllocAllocator : IAllocator
 {
     public static readonly nuint PageSize = (nuint)Environment.SystemPageSize;
-    public static void* Allocate(void* context, nuint size)
+    public static void* Allocate(nuint size)
     {
         var mem = Kernel32.VirtualAlloc(null, size, AllocationType.MEM_RESERVE | AllocationType.MEM_COMMIT, AllocationProtect.PAGE_READWRITE);
         Debug.Assert(mem != null, $"Failed to allocate {size} bytes of memory.");
         return mem;
     }
-    public static void Free(void* context, void* ptr)
+    public static void Free(void* ptr)
     {
         var result = Kernel32.VirtualFree(ptr, 0, AllocationType.MEM_RELEASE);
         Debug.Assert(result, "Failed to release memory");
     }
-
-    public static void* CreateContext() => null;
-    public static void ReleaseContext(void* context) { }
 }
 
 internal unsafe struct NativeMemoryAllocator : IAllocator
 {
-    public static void* Allocate(void* context, nuint size)
+    public static void* Allocate(nuint size)
     {
         var mem = NativeMemory.Alloc(size);
         Debug.Assert(mem != null, $"Failed to allocate {size} bytes of memory.");
         return mem;
     }
-    public static void Free(void* context, void* ptr) => NativeMemory.Free(ptr);
-    public static void* CreateContext() => null;
-    public static void ReleaseContext(void* context) { }
+    public static void Free(void* ptr) => NativeMemory.Free(ptr);
 }

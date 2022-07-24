@@ -3,14 +3,17 @@
 unsafe
 {
 
-    var native = PlatformAllocator.Create<NativeMemoryAllocator>();
-    var win32 = PlatformAllocator.Create<Win32VirtualAllocAllocator>();
+    var native = Allocator.Create<NativeMemoryAllocator>();
+    var win32 = Allocator.Create<Win32VirtualAllocAllocator>();
+    var win32Fixed = Allocator.Create<Win32VirtualAllocFixedSizeAllocator, Win32PoolArgs>(new Win32PoolArgs { Size = 1024 * 1024 * 100 /* 100 MB */});
+
+    var allocator = native;
     {
         Console.ForegroundColor = ConsoleColor.Red;
         Console.WriteLine($"****** {nameof(PoolArena)} ******");
         Console.ResetColor();
         Console.WriteLine($"{nameof(PoolArena)} size {sizeof(PoolArena)} bytes");
-        var arena = PoolArena.Create(&win32, 10, (uint)sizeof(TestStruct));
+        var arena = PoolArena.Create(&allocator, 10, (uint)sizeof(TestStruct));
 
         var maxCount = 12;
         var test = stackalloc TestStruct*[maxCount];
@@ -52,7 +55,7 @@ unsafe
         Console.ResetColor();
         // linear arena
         Console.WriteLine($"{nameof(DynamicLinearArena)} size {sizeof(DynamicLinearArena)} bytes");
-        var arena = DynamicLinearArena.Create(&win32, 320);
+        var arena = DynamicLinearArena.Create(&allocator, 320);
         //var arena = DynamicLinearArena.Create(&native, 320);
         var maxCount = 12;
         var test = stackalloc TestStruct*[maxCount];
@@ -100,7 +103,7 @@ unsafe
         // linear arena
         Console.WriteLine($"{nameof(FixedSizeLinearArena)} size {sizeof(FixedSizeLinearArena)} bytes");
         const nuint ArenaSize = 1024;
-        var arena = FixedSizeLinearArena.Create(win32.Allocate(ArenaSize), ArenaSize);
+        var arena = FixedSizeLinearArena.Create(allocator.Allocate(ArenaSize), ArenaSize);
         var maxCount = 4;
         var test = stackalloc TestStruct*[maxCount];
         for (var i = 0; i < maxCount; ++i)

@@ -5,12 +5,12 @@ namespace Titan.Memory;
 
 internal unsafe struct PoolArena
 {
-    private PlatformAllocator* _allocator; // used to free and expand the pool
+    private Allocator* _allocator; // used to free and expand the pool
     private byte* _mem;
     private Block* _freeList;
     private ushort _blockSize;
     private ushort _count;
-    public static PoolArena Create(PlatformAllocator* allocator, uint count, uint blockSize) =>
+    public static PoolArena Create(Allocator* allocator, uint count, uint blockSize) =>
         new()
         {
             _allocator = allocator,
@@ -62,12 +62,14 @@ internal unsafe struct PoolArena
     {
         var footerSize = sizeof(Footer);
         var poolSize = _blockSize * _count;
-        var mem = (byte*)_allocator->Allocate((nuint)(poolSize + footerSize));
+        var mem = (byte*)_allocator->Allocate((nuint)(poolSize + footerSize)); //We could enforce 0 alloc
         for (var i = 0; i < _count - 1; ++i)
         {
             var block = (Block*)(mem + _blockSize * i);
             block->Next = (Block*)(mem + _blockSize * (i + 1));
         }
+        ((Block*)(mem + _blockSize * (_count - 1)))->Next = null;
+
         Console.WriteLine($"Expanding pool, stor old pointer: {(nuint)_mem}");
         var footer = (Footer*)(mem + poolSize);
         footer->PreviousBlock = _mem;

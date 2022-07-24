@@ -11,7 +11,7 @@ internal static class DynamicLinearArenaExtensions
 internal unsafe struct DynamicLinearArena
 {
     private static readonly nuint FooterSize = (nuint)sizeof(Footer);
-    private readonly PlatformAllocator* _allocator;
+    private readonly Allocator* _allocator;
     private readonly byte* _baseMemory;
     private byte* _current;
     private volatile int _offset; // the memory offset in the current region
@@ -52,7 +52,7 @@ internal unsafe struct DynamicLinearArena
         }
     }
 
-    private DynamicLinearArena(PlatformAllocator* allocator, nuint blockSize)
+    private DynamicLinearArena(Allocator* allocator, nuint blockSize)
     {
         _allocator = allocator;
         _blockSize = (int)blockSize;
@@ -61,7 +61,7 @@ internal unsafe struct DynamicLinearArena
         GetFooter(_current)->Next = null;
     }
 
-    public static DynamicLinearArena Create(PlatformAllocator* allocator, nuint initialSize) => new(allocator, initialSize);
+    public static DynamicLinearArena Create(Allocator* allocator, nuint initialSize) => new(allocator, initialSize);
 
     private void Expand()
     {

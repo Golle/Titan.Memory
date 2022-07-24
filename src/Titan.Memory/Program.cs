@@ -2,10 +2,15 @@
 
 unsafe
 {
-
     var native = Allocator.Create<NativeMemoryAllocator>();
     var win32 = Allocator.Create<Win32VirtualAllocAllocator>();
-    var win32Fixed = Allocator.Create<Win32VirtualAllocFixedSizeAllocator, Win32PoolArgs>(new Win32PoolArgs { Size = 1024 * 1024 * 100 /* 100 MB */});
+
+    var win32Fixed = Allocator.Create<Win32VirtualAllocFixedSizeAllocator, Win32PoolArgs>(
+        new Win32PoolArgs
+        {
+            Size = 1024 * 1024 * 100 /* 100 MB */
+        }
+    );
 
     var allocator = native;
     {
@@ -142,6 +147,8 @@ unsafe
     native.Free(mem1);
     win32.Free(mem2);
 
+
+    win32Fixed.Release();
     Console.WriteLine("Hello, World!");
 }
 

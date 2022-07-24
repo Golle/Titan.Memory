@@ -48,11 +48,12 @@ unsafe
     Console.WriteLine();
     {
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"****** {nameof(LinearArena)} ******");
+        Console.WriteLine($"****** {nameof(DynamicLinearArena)} ******");
         Console.ResetColor();
         // linear arena
-        Console.WriteLine($"{nameof(LinearArena)} size {sizeof(LinearArena)} bytes");
-        var arena = LinearArena.Create(&win32, 320);
+        Console.WriteLine($"{nameof(DynamicLinearArena)} size {sizeof(DynamicLinearArena)} bytes");
+        var arena = DynamicLinearArena.Create(&win32, 320);
+        //var arena = DynamicLinearArena.Create(&native, 320);
         var maxCount = 12;
         var test = stackalloc TestStruct*[maxCount];
         for (var i = 0; i < maxCount; ++i)
@@ -68,7 +69,7 @@ unsafe
             Console.WriteLine($"Linear Arena[{i}]: {test[i]->A} {test[i]->B} {test[i]->C}");
         }
         arena.Reset();
-        for (var i = 0; i < maxCount*3; ++i)
+        for (var i = 0; i < maxCount * 3; ++i)
         {
             var value = arena.Allocate<TestStruct>();
             value->A = 10 * i;
@@ -76,7 +77,7 @@ unsafe
             value->C = 13 * i;
         }
         //arena.Reset(); 
-        
+
         for (var i = 0; i < maxCount; ++i)
         {
             var value = arena.Allocate<TestStruct>();
@@ -87,7 +88,43 @@ unsafe
         }
         arena.Release();
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"****** {nameof(LinearArena)} ******");
+        Console.WriteLine($"****** {nameof(DynamicLinearArena)} ******");
+        Console.ResetColor();
+    }
+
+    Console.WriteLine();
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"****** {nameof(FixedSizeLinearArena)} ******");
+        Console.ResetColor();
+        // linear arena
+        Console.WriteLine($"{nameof(FixedSizeLinearArena)} size {sizeof(FixedSizeLinearArena)} bytes");
+        const nuint ArenaSize = 1024;
+        var arena = FixedSizeLinearArena.Create(win32.Allocate(ArenaSize), ArenaSize);
+        var maxCount = 4;
+        var test = stackalloc TestStruct*[maxCount];
+        for (var i = 0; i < maxCount; ++i)
+        {
+            var value = arena.Allocate<TestStruct>();
+            value->A = 10 * i;
+            value->B = 12 * i;
+            value->C = 13 * i;
+            test[i] = value;
+        }
+        for (var i = 0; i < maxCount; ++i)
+        {
+            Console.WriteLine($"FixedSizeLinearArena[{i}]: {test[i]->A} {test[i]->B} {test[i]->C}");
+        }
+        arena.Reset();
+        for (var i = 0; i < maxCount; ++i)
+        {
+            var value = arena.Allocate<TestStruct>();
+            value->A = 10 * i;
+            value->B = 12 * i;
+            value->C = 13 * i;
+        }
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"****** {nameof(DynamicLinearArena)} ******");
         Console.ResetColor();
     }
 
@@ -111,5 +148,4 @@ internal struct TestStruct
 }
 
 
-internal unsafe struct FixedSizeArena { /*TBD*/ }
 internal unsafe struct FixedPoolSizeArea { /*TBD*/ }

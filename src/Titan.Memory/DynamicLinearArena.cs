@@ -1,15 +1,14 @@
 ﻿using System.Runtime.CompilerServices;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace Titan.Memory;
 
 
-internal static class LinearArenaExtensions
+internal static class DynamicLinearArenaExtensions
 {
-    public static unsafe T* Allocate<T>(this ref LinearArena arena) where T : unmanaged => (T*)arena.Allocate((nuint)sizeof(T));
+    public static unsafe T* Allocate<T>(this ref DynamicLinearArena arena) where T : unmanaged => (T*)arena.Allocate((nuint)sizeof(T));
 }
 
-internal unsafe struct LinearArena
+internal unsafe struct DynamicLinearArena
 {
     private static readonly nuint FooterSize = (nuint)sizeof(Footer);
     private readonly PlatformAllocator* _allocator;
@@ -53,15 +52,16 @@ internal unsafe struct LinearArena
         }
     }
 
-    private LinearArena(PlatformAllocator* allocator, nuint blockSize)
+    private DynamicLinearArena(PlatformAllocator* allocator, nuint blockSize)
     {
         _allocator = allocator;
         _blockSize = (int)blockSize;
         _offset = 0;
         _current = _baseMemory = (byte*)_allocator->Allocate(blockSize + FooterSize); // TODO: Align this
+        GetFooter(_current)->Next = null;
     }
 
-    public static LinearArena Create(PlatformAllocator* allocator, nuint initialSize) => new(allocator, initialSize);
+    public static DynamicLinearArena Create(PlatformAllocator* allocator, nuint initialSize) => new(allocator, initialSize);
 
     private void Expand()
     {
@@ -70,6 +70,9 @@ internal unsafe struct LinearArena
         GetFooter(_current)->Next = mem;
         _current = mem;
         Console.WriteLine($"Expanding the pool: {(nuint)_current}");
+
+        // Make sure the Next pointer is set to null. The underlying Allocator might not zero the memory
+        GetFooter(_current)->Next = null;
     }
 
     public void Release() 

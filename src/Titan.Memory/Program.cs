@@ -1,164 +1,95 @@
-﻿using Titan.Memory;
+﻿using System.Collections.Specialized;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using Titan.Memory;
+using Titan.Memory.Allocators;
+using Titan.Memory.Posix;
+using Titan.Memory.Win32;
+
+
+Console.WriteLine($"Hello world, {typeof(Program).Assembly.GetName().Name}");
+
 
 unsafe
 {
-    var native = Allocator.Create<NativeMemoryAllocator>();
-    var win32 = Allocator.Create<Win32VirtualAllocAllocator>();
+    var type = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? typeof(Win32PlatformAllocator) : typeof(PosixPlatformAllocator);
+    var allocator = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? PlatformAllocator.Create<Win32PlatformAllocator>() : PlatformAllocator.Create<PosixPlatformAllocator>();
+    Console.WriteLine($"Using {type} for virtual memory allocations");
+    var sizeToReserve = 1024 * 1024 * 1024;
 
-    var win32Fixed = Allocator.Create<Win32VirtualAllocFixedSizeAllocator, Win32PoolArgs>(
-        new Win32PoolArgs
-        {
-            Size = 1024 * 1024 * 100 /* 100 MB */
-        }
-    );
-
-    var allocator = win32Fixed;
+    if (!GeneralAllocator.Create(&allocator, (nuint)sizeToReserve, 0, out var genAllocator))
     {
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"****** {nameof(PoolArena)} ******");
-        Console.ResetColor();
-        Console.WriteLine($"{nameof(PoolArena)} size {sizeof(PoolArena)} bytes");
-        var arena = PoolArena.Create(&allocator, 10, (uint)sizeof(TestStruct));
-
-        var maxCount = 12;
-        var test = stackalloc TestStruct*[maxCount];
-        for (var i = 0; i < maxCount; ++i)
-        {
-            var test1 = arena.Allocate<TestStruct>();
-            test1->A = 10 * i;
-            test1->B = 12 * i;
-            test1->C = 13 * i;
-            test[i] = test1;
-        }
-
-        for (var i = 0; i < 5; ++i)
-        {
-            arena.Free(test[i]);
-        }
-        for (var i = 0; i < 5; ++i)
-        {
-            var test1 = arena.Allocate<TestStruct>();
-            test1->A = 2 * i;
-            test1->B = 3 * i;
-            test1->C = 4 * i;
-            test[i] = test1;
-        }
-        for (var i = 0; i < 10; ++i)
-        {
-            Console.WriteLine($"Pool Arena[{i}]: {test[i]->A} {test[i]->B} {test[i]->C}");
-        }
-
-        arena.Release();
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"****** {nameof(PoolArena)} ******");
-        Console.ResetColor();
-    }
-    Console.WriteLine();
-    {
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"****** {nameof(DynamicLinearArena)} ******");
-        Console.ResetColor();
-        // linear arena
-        Console.WriteLine($"{nameof(DynamicLinearArena)} size {sizeof(DynamicLinearArena)} bytes");
-        var arena = DynamicLinearArena.Create(&allocator, 320);
-        //var arena = DynamicLinearArena.Create(&native, 320);
-        var maxCount = 12;
-        var test = stackalloc TestStruct*[maxCount];
-        for (var i = 0; i < maxCount; ++i)
-        {
-            var value = arena.Allocate<TestStruct>();
-            value->A = 10 * i;
-            value->B = 12 * i;
-            value->C = 13 * i;
-            test[i] = value;
-        }
-        for (var i = 0; i < 10; ++i)
-        {
-            Console.WriteLine($"Linear Arena[{i}]: {test[i]->A} {test[i]->B} {test[i]->C}");
-        }
-        arena.Reset();
-        for (var i = 0; i < maxCount * 3; ++i)
-        {
-            var value = arena.Allocate<TestStruct>();
-            value->A = 10 * i;
-            value->B = 12 * i;
-            value->C = 13 * i;
-        }
-        //arena.Reset(); 
-
-        for (var i = 0; i < maxCount; ++i)
-        {
-            var value = arena.Allocate<TestStruct>();
-            value->A = 10 * i;
-            value->B = 12 * i;
-            value->C = 13 * i;
-            test[i] = value;
-        }
-        arena.Release();
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"****** {nameof(DynamicLinearArena)} ******");
-        Console.ResetColor();
+        Console.WriteLine($"Failed to create the {nameof(GeneralAllocator)}");
+        return;
     }
 
-    Console.WriteLine();
+    var mems = stackalloc void*[100];
+    var count = 0;
+    //var a =  genAllocator.Allocate(120);
+    //var b = mems[count++] = genAllocator.Allocate(160);
+    //var c = genAllocator.Allocate(200);
+    ////genAllocator.Free(b);
+    //genAllocator.Free(c);
+    mems[count++] = genAllocator.Allocate(150);
+    //genAllocator.Free(a);
+    genAllocator.Free(genAllocator.Allocate(180));
+    mems[count++] = genAllocator.Allocate(2010);
+    //mems[count++] = genAllocator.Allocate(200);
+    var tmpMem = genAllocator.Allocate(1010);
+    genAllocator.PrintDebugInfo();
+
+    genAllocator.Free(genAllocator.Allocate(3010));
+    genAllocator.PrintDebugInfo();
+    mems[count++] = genAllocator.Allocate(1020);
+    genAllocator.PrintDebugInfo();
+    mems[count++] = genAllocator.Allocate(10110);
+    genAllocator.PrintDebugInfo();
+    genAllocator.Free(tmpMem);
+    //mems[count++] = genAllocator.Allocate(10110);
+    //mems[count++] = genAllocator.Allocate(10110);
+    //mems[count++] = genAllocator.Allocate(10110);
+    //mems[count++] = genAllocator.Allocate(10110);
+
+    for (var i = 0; i < count; ++i)
     {
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"****** {nameof(FixedSizeLinearArena)} ******");
-        Console.ResetColor();
-        // linear arena
-        Console.WriteLine($"{nameof(FixedSizeLinearArena)} size {sizeof(FixedSizeLinearArena)} bytes");
-        const nuint ArenaSize = 1024;
-        var arena = FixedSizeLinearArena.Create(allocator.Allocate(ArenaSize), ArenaSize);
-        var maxCount = 4;
-        var test = stackalloc TestStruct*[maxCount];
-        for (var i = 0; i < maxCount; ++i)
-        {
-            var value = arena.Allocate<TestStruct>();
-            value->A = 10 * i;
-            value->B = 12 * i;
-            value->C = 13 * i;
-            test[i] = value;
-        }
-        for (var i = 0; i < maxCount; ++i)
-        {
-            Console.WriteLine($"FixedSizeLinearArena[{i}]: {test[i]->A} {test[i]->B} {test[i]->C}");
-        }
-        arena.Reset();
-        for (var i = 0; i < maxCount; ++i)
-        {
-            var value = arena.Allocate<TestStruct>();
-            value->A = 10 * i;
-            value->B = 12 * i;
-            value->C = 13 * i;
-        }
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"****** {nameof(DynamicLinearArena)} ******");
-        Console.ResetColor();
+        genAllocator.PrintDebugInfo();
+        genAllocator.Free(mems[i]);
     }
 
-    var mem1 = (byte*)native.Allocate(1024);
-    var mem2 = (byte*)win32.Allocate(1024);
+    genAllocator.PrintDebugInfo();
 
-    mem1[10] = 111;
-    mem2[10] = 112;
-
-    Console.WriteLine($"{*(mem1 + 10)} {*(mem2 + 10)}");
-
-    native.Free(mem1);
-    win32.Free(mem2);
+    genAllocator.Release();
+    genAllocator.Release();
 
 
-    win32Fixed.Release();
-    native.Release();
-    win32.Release();
+    //if (!VirtualMemory.Create(&allocator, (nuint)sizeToReserve, out var vm))
+    //{
+    //    Console.WriteLine("Failed to create the Virtual memory");
+    //    return;
+    //}
 
-    Console.WriteLine("Hello, World!");
+    //vm.Resize(1);
+    //*((byte*)vm.Mem + pageSize-1) = 10;
+    //vm.Resize(4000);
+    //*((byte*)vm.Mem + pageSize - 1) = 10;
+    //vm.Resize(40090);
+    //*((byte*)vm.Mem + 5*pageSize - 1) = 10;
+    //vm.Resize(4009110);
+    //*((byte*)vm.Mem + 875 * pageSize - 1) = 10;
+    //vm.Resize(40090);
+    //*((byte*)vm.Mem + 5*pageSize - 1) = 10;
+
 }
 
-internal struct TestStruct
+
+namespace Titan.Memory
 {
-    public int A, B, C;
+    internal unsafe struct PoolAllocator<T> where T : unmanaged { }
+    internal struct StackAllocator { }
+    internal struct LinearAllocator { }
 }
 
-
-internal unsafe struct FixedPoolSizeArea { /*TBD*/ }
+struct ATestStruct
+{
+    public uint A, B, C, D, E;
+}

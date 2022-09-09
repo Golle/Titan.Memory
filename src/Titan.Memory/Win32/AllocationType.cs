@@ -1,4 +1,6 @@
-﻿namespace Titan.Memory.Win32;
+﻿using System;
+
+namespace Titan.Memory.Win32;
 
 [Flags]
 internal enum AllocationType : uint

@@ -154,7 +154,9 @@ internal unsafe struct GeneralAllocator
         Debug.Assert(ptr != null);
         Debug.Assert(_memory.MaxSize > 0);
         var header = (Header*)ptr - 1;
+        // Check bounds
         Debug.Assert(header >= _memory.Mem);
+        Debug.Assert(header < (byte*)_memory.Mem + _memory.Size);
         if (header->State != AllocationState.Allocated)
         {
             Console.WriteLine("Memory has already been freed or was not allocated with this allocator.");
@@ -171,8 +173,7 @@ internal unsafe struct GeneralAllocator
 
     private void MergeWithNext(Header* current)
     {
-        //NOTE(Jens): if both current and next is free, merge them
-
+        //NOTE(Jens): if both current and next are free, merge them
         if (IsFree(current) && IsFree(current->Next))
         {
             var next = current->Next;
@@ -199,11 +200,14 @@ internal unsafe struct GeneralAllocator
         _memory = default;
     }
 
+    //NOTE(Jens): Current header size is 24 bytes, we can reduce that by packing and doing some extra calculations. Memory/Performance trade. 
     private struct Header
     {
         //NOTE(Jens): we could pack the magic into 2 bytes and the size into 6 bytes if we want to support greater sizes.
         public AllocationState State;
         public uint BlockSize;
+
+        //NOTE(Jens): next pointer is not really required since it is the same as  (Header)((byte*)&this + BlockSize). But if we do this we need to check that it's not out of bounds. This will save 8 bytes per allocation
         public Header* Next;
         public Header* Previous;
     }
@@ -213,7 +217,6 @@ internal unsafe struct GeneralAllocator
         Allocated = 0xeeffffee,
         Free = 0xfffaafff
     }
-
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool IsWithinMemoryBlock(void* ptr)

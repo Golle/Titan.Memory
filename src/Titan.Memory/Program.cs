@@ -1,6 +1,7 @@
 ﻿//#define TEST_GEN
 //#define TEST_LINEAR
-#define TEST_LINEAR_DYNAMIC
+//#define TEST_LINEAR_DYNAMIC
+#define TEST_POOL
 
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -109,6 +110,7 @@ unsafe
         linearAllocator.DebugPrint();
         linearAllocator.Release();
         linearAllocator.DebugPrint();
+        genAllocator.Release();
 
     }
 #endif
@@ -152,14 +154,70 @@ unsafe
     }
 #endif
 
+#if TEST_POOL
+    {
+        if (!GeneralAllocator.Create(&allocator, 1024 * 1024 * 1024, 0, out var genAllocator))
+        {
+            Console.WriteLine($"Failed to create a {nameof(GeneralAllocator)}.");
+            return -1;
+        }
+
+        if (!FixedSizePoolAllocator<ATestStruct>.Create(&genAllocator, 1000, out var pool))
+        {
+            Console.WriteLine($"Failed to create a {nameof(FixedSizePoolAllocator<ATestStruct>)}.");
+            return -1;
+        }
+
+
+        var maxCount = 1000;
+        var structs = stackalloc ATestStruct*[maxCount];
+
+        for (var i = 0; i < maxCount/2; ++i)
+        {
+            structs[i] = pool.Allocate();
+            structs[i]->A = (uint)(10 * (i + 1));
+            structs[i]->E = (uint)(15 * (i + 1));
+        }
+
+        for (var i = 0; i < maxCount / 2; ++i)
+        {
+            pool.Free(structs[i]);
+        }
+        for (var i = 0; i < maxCount; ++i)
+        {
+            structs[i] = pool.Allocate();
+            structs[i]->A = (uint)(10 * (i + 1));
+            structs[i]->E = (uint)(15 * (i + 1));
+        }
+        for (var i = 0; i < maxCount; ++i)
+        {
+            Debug.Assert(structs[i]->A == (uint)(10 * (i + 1)));
+            Debug.Assert(structs[i]->E == (uint)(15 * (i + 1)));
+        }
+
+        //for (var i = 0; i < maxCount; ++i)
+        //{
+        //    pool.Free(structs[i]);
+        //}
+
+        //for (var i = 0; i < maxCount; ++i)
+        //{
+        //    Debug.Assert(structs[i]->A == (uint)(10 * (i + 1)));
+        //    Debug.Assert(structs[i]->E == (uint)(15 * (i + 1)));
+        //}
+        pool.Release();
+
+
+        genAllocator.Release();
+
+    }
+#endif
 }
 
 return 0;
 
 namespace Titan.Memory
 {
-    internal unsafe struct PoolAllocator<T> where T : unmanaged { }
-    internal struct StackAllocator { }
 
 }
 

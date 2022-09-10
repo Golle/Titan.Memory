@@ -1,15 +1,20 @@
-﻿using System.Collections.Specialized;
+﻿//#define TEST_GEN
+//#define TEST_LINEAR
+#define TEST_LINEAR_DYNAMIC
+
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text;
 using Titan.Memory;
 using Titan.Memory.Allocators;
 using Titan.Memory.Posix;
 using Titan.Memory.Win32;
 
 
+
+
+
 Console.WriteLine($"Hello world, {typeof(Program).Assembly.GetName().Name}");
-
-
 unsafe
 {
     var type = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? typeof(Win32PlatformAllocator) : typeof(PosixPlatformAllocator);
@@ -17,76 +22,145 @@ unsafe
     Console.WriteLine($"Using {type} for virtual memory allocations");
     var sizeToReserve = 1024 * 1024 * 1024;
 
-    if (!GeneralAllocator.Create(&allocator, (nuint)sizeToReserve, 0, out var genAllocator))
+
+#if TEST_GEN
     {
-        Console.WriteLine($"Failed to create the {nameof(GeneralAllocator)}");
-        return;
-    }
+        if (!GeneralAllocator.Create(&allocator, (nuint)sizeToReserve, 0, out var genAllocator))
+        {
+            Console.WriteLine($"Failed to create the {nameof(GeneralAllocator)}");
+            return -1;
+        }
 
-    var mems = stackalloc void*[100];
-    var count = 0;
-    //var a =  genAllocator.Allocate(120);
-    //var b = mems[count++] = genAllocator.Allocate(160);
-    //var c = genAllocator.Allocate(200);
-    ////genAllocator.Free(b);
-    //genAllocator.Free(c);
-    mems[count++] = genAllocator.Allocate(150);
-    //genAllocator.Free(a);
-    genAllocator.Free(genAllocator.Allocate(180));
-    mems[count++] = genAllocator.Allocate(2010);
-    //mems[count++] = genAllocator.Allocate(200);
-    var tmpMem = genAllocator.Allocate(1010);
-    genAllocator.PrintDebugInfo();
-
-    genAllocator.Free(genAllocator.Allocate(3010));
-    genAllocator.PrintDebugInfo();
-    mems[count++] = genAllocator.Allocate(1020);
-    genAllocator.PrintDebugInfo();
-    mems[count++] = genAllocator.Allocate(10110);
-    genAllocator.PrintDebugInfo();
-    genAllocator.Free(tmpMem);
-    //mems[count++] = genAllocator.Allocate(10110);
-    //mems[count++] = genAllocator.Allocate(10110);
-    //mems[count++] = genAllocator.Allocate(10110);
-    //mems[count++] = genAllocator.Allocate(10110);
-
-    for (var i = 0; i < count; ++i)
-    {
+        var mems = stackalloc void*[100];
+        var count = 0;
+        mems[count++] = genAllocator.Allocate(150);
+        genAllocator.Free(genAllocator.Allocate(180));
+        mems[count++] = genAllocator.Allocate(2010);
+        var tmpMem = genAllocator.Allocate(1010);
         genAllocator.PrintDebugInfo();
-        genAllocator.Free(mems[i]);
+
+        genAllocator.Free(genAllocator.Allocate(3010));
+        genAllocator.PrintDebugInfo();
+        mems[count++] = genAllocator.Allocate(1020);
+        genAllocator.PrintDebugInfo();
+        mems[count++] = genAllocator.Allocate(10110);
+        genAllocator.PrintDebugInfo();
+        genAllocator.Free(tmpMem);
+
+        for (var i = 0; i < count; ++i)
+        {
+            genAllocator.PrintDebugInfo();
+            genAllocator.Free(mems[i]);
+        }
+
+        genAllocator.PrintDebugInfo();
+
+        genAllocator.Release();
+        genAllocator.Release();
     }
+#endif
 
-    genAllocator.PrintDebugInfo();
+#if TEST_LINEAR
+    {
+        if (!GeneralAllocator.Create(&allocator, 1024 * 1024 * 1024, 0, out var genAllocator))
+        {
+            Console.WriteLine($"Failed to create a {nameof(GeneralAllocator)}.");
+            return -1;
+        }
 
-    genAllocator.Release();
-    genAllocator.Release();
+        if (!LinearFixedSizeAllocator.Create(&genAllocator, 1024 * 1024, out var linearAllocator))
+        {
+            Console.WriteLine($"Failed to create a {nameof(LinearFixedSizeAllocator)}.");
+            return -1;
+        }
+
+        const int max = 100;
+        var testStructs = stackalloc ATestStruct*[max];
+        for (var i = 1u; i < max; ++i)
+        {
+            testStructs[i] = linearAllocator.Allocate<ATestStruct>();
+            testStructs[i]->A = 10 * i;
+            testStructs[i]->C = 15 * i;
+        }
+
+        for (var i = 1; i < max; ++i)
+        {
+            var str = testStructs[i];
+            Debug.Assert(str->A == i * 10);
+            Debug.Assert(str->C == i * 15);
+        }
+        linearAllocator.DebugPrint();
+        linearAllocator.Reset();
+        linearAllocator.DebugPrint();
+
+        for (var i = 1u; i < max; ++i)
+        {
+            testStructs[i] = linearAllocator.AllocateAligned<ATestStruct>();
+            testStructs[i]->A = 10 * i;
+            testStructs[i]->C = 15 * i;
+        }
+
+        for (var i = 1; i < max; ++i)
+        {
+            var str = testStructs[i];
+            Debug.Assert(str->A == i * 10);
+            Debug.Assert(str->C == i * 15);
+        }
+        linearAllocator.DebugPrint();
+        linearAllocator.Release();
+        linearAllocator.DebugPrint();
+
+    }
+#endif
+
+#if TEST_LINEAR_DYNAMIC
+    {
+        if (!LinearDynamicSizeAllocator.Create(&allocator, 1024 * 1024, out var linearDynamic))
+        {
+            Console.WriteLine($"Failed to create the {nameof(LinearDynamicSizeAllocator)}");
+            return -1;
+        }
+
+        const int maxCount = 10000;
+        var allocs = stackalloc ATestStruct*[maxCount];
+
+        for (var i = 0; i < maxCount; i++)
+        {
+            allocs[i] = linearDynamic.Allocate<ATestStruct>();
+            allocs[i]->A = (uint)(10 * (i + 1));
+            allocs[i]->E = (uint)(15 * (i + 1));
+        }
+
+        for (var i = 0; i < maxCount; i++)
+        {
+            Debug.Assert(allocs[i]->A == (uint)(10 * (i + 1)));
+            Debug.Assert(allocs[i]->E == (uint)(15 * (i + 1)));
+        }
+
+        linearDynamic.Reset();
+
+        for (var i = 0; i < maxCount; i++)
+        {
+            allocs[i] = linearDynamic.Allocate<ATestStruct>();
+            allocs[i]->A = (uint)(10 * (i + 1));
+            allocs[i]->E = (uint)(15 * (i + 1));
+        }
 
 
-    //if (!VirtualMemory.Create(&allocator, (nuint)sizeToReserve, out var vm))
-    //{
-    //    Console.WriteLine("Failed to create the Virtual memory");
-    //    return;
-    //}
+        linearDynamic.Release();
 
-    //vm.Resize(1);
-    //*((byte*)vm.Mem + pageSize-1) = 10;
-    //vm.Resize(4000);
-    //*((byte*)vm.Mem + pageSize - 1) = 10;
-    //vm.Resize(40090);
-    //*((byte*)vm.Mem + 5*pageSize - 1) = 10;
-    //vm.Resize(4009110);
-    //*((byte*)vm.Mem + 875 * pageSize - 1) = 10;
-    //vm.Resize(40090);
-    //*((byte*)vm.Mem + 5*pageSize - 1) = 10;
+    }
+#endif
 
 }
 
+return 0;
 
 namespace Titan.Memory
 {
     internal unsafe struct PoolAllocator<T> where T : unmanaged { }
     internal struct StackAllocator { }
-    internal struct LinearAllocator { }
+
 }
 
 struct ATestStruct

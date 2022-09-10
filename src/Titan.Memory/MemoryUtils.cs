@@ -13,12 +13,18 @@ public static class MemoryUtils
     public static nuint Align(nuint size)
         => size & ~(nuint)7u;
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static uint Align(uint size)
         => size & ~7u;
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static uint AlignUp(uint size)
-        => (size & ~7u) + 8u;
+    {
+        var alignedSize = (size & ~7u);
+        return alignedSize < size ? alignedSize + 8u : alignedSize;
+    }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static nuint Align(nuint size, uint alignment)
     {
         var mask = alignment - 1u;
@@ -26,6 +32,7 @@ public static class MemoryUtils
         return alignedMemory;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static nuint AlignUp(nuint size, uint alignment)
     {
         var alignedMemory = Align(size, alignment);
